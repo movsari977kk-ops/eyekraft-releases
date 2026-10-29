@@ -1,0 +1,31 @@
+name: Remove obsolete Eyekraft 0.7.0 release
+on:
+  push:
+    paths: ['.github/workflows/cleanup-old-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: eyekraft-release-cleanup
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Preserve the current update and remove only obsolete 0.7.0
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/$GH_REPO/releases/latest")
+          test "$(jq -r .tag_name <<< "$latest")" = v0.7.1
+          jq -e '[.assets[].name] | index("Eyekraft-Setup-0.7.1.exe") != null and index("Eyekraft-Setup-0.7.1.exe.blockmap") != null and index("latest.yml") != null' <<< "$latest"
+          old=$(gh api "repos/$GH_REPO/releases/tags/v0.7.0")
+          test "$(jq -r .id <<< "$old")" = 425179355
+          test "$(jq -r .draft <<< "$old")" = false
+          jq -r '[.assets[].size] | add' <<< "$old"
+          gh release delete v0.7.0 --repo "$GH_REPO" --yes --cleanup-tag
+          gh api "repos/$GH_REPO/releases/latest" --jq '.tag_name'
