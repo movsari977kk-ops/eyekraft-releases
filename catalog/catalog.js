@@ -20,3 +20,6 @@ $('#retry').addEventListener('click',sendPending);window.addEventListener('onlin
 $('#connection').textContent=valid()?'Телефон подключён для отправки черновиков.':'Откройте «Склад → Добавить с телефона» на ноутбуке и отсканируйте QR-код.';
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 renderQueue().then(()=>valid()&&sendPending()).catch(e=>message(e.message,true));
+
+window.addEventListener('hashchange',()=>location.reload());
+
