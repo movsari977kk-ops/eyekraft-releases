@@ -25,6 +25,9 @@ jobs:
           echo 'b81afad37a193e038c746c383bfd7cdf31abc5c03b43fe4cd3fddf72535c51dd  phone-catalog.zip' | sha256sum --check -
           mkdir -p _site
           unzip -q phone-catalog.zip -d _site
+          curl --fail --location --retry 3 'https://github.com/movsari977kk-ops/eyekraft-releases/releases/download/v0.7.8/phone-overlay-0.7.8-final2.zip' -o overlay.zip
+          echo 'f78cabcf1e126e105054731250a68a691614ef1e4d6213e2a4d492e08ec88f94  overlay.zip' | sha256sum --check -
+          unzip -oq overlay.zip -d _site
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v4
         with:
