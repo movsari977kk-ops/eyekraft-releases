@@ -26,6 +26,7 @@ jobs:
           if ((Get-FileHash build-source-0.7.8.zip -Algorithm SHA256).Hash -ne 'B34B93A6951C47DEF7307ECED9CFBB2CA04B531EC7716C9968BE439BF1A7437B') { throw 'Source hash mismatch' }
           if ((Get-FileHash phone-overlay-0.7.8.zip -Algorithm SHA256).Hash -ne 'D02872FB14AE9961BCCC387621400DDFF87EF0209D19B1ECCE550DB78F00BF3F') { throw 'Phone hash mismatch' }
           Expand-Archive build-source-0.7.8.zip source
+          Expand-Archive phone-overlay-0.7.8.zip source/phone-catalog -Force
       - name: Install pinned dependencies
         working-directory: source
         run: npm ci
