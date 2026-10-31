@@ -18,14 +18,13 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v6
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - name: Prepare public static files only
+      - name: Download and verify public phone assets
         run: |
-          mkdir -p _site/catalog
-          cp catalog/* _site/catalog/
+          curl --fail --location --retry 3 'https://github.com/movsari977kk-ops/eyekraft-releases/releases/download/v0.7.7/phone-catalog-0.7.7.zip' -o phone-catalog.zip
+          echo 'b81afad37a193e038c746c383bfd7cdf31abc5c03b43fe4cd3fddf72535c51dd  phone-catalog.zip' | sha256sum --check -
+          mkdir -p _site
+          unzip -q phone-catalog.zip -d _site
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v4
         with:
