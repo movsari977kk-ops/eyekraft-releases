@@ -4,7 +4,7 @@ on:
     paths: ['catalog/**', '.github/workflows/catalog-pages.yml']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 concurrency:
@@ -19,13 +19,23 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/configure-pages@v5
+      - name: Preserve phone assets on v0.7.11
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for asset in phone-catalog-assets.zip phone-overlay-assets.zip; do
+            if ! gh release view v0.7.11 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$asset"; then
+              gh release download v0.7.9 --repo "$GITHUB_REPOSITORY" --pattern "$asset"
+              gh release upload v0.7.11 "$asset" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
       - name: Download and verify public phone assets
         run: |
-          curl --fail --location --retry 3 'https://github.com/movsari977kk-ops/eyekraft-releases/releases/download/v0.7.9/phone-catalog-assets.zip' -o phone-catalog.zip
+          curl --fail --location --retry 3 'https://github.com/movsari977kk-ops/eyekraft-releases/releases/download/v0.7.11/phone-catalog-assets.zip' -o phone-catalog.zip
           echo 'b81afad37a193e038c746c383bfd7cdf31abc5c03b43fe4cd3fddf72535c51dd  phone-catalog.zip' | sha256sum --check -
           mkdir -p _site
           unzip -q phone-catalog.zip -d _site
-          curl --fail --location --retry 3 'https://github.com/movsari977kk-ops/eyekraft-releases/releases/download/v0.7.9/phone-overlay-assets.zip' -o overlay.zip
+          curl --fail --location --retry 3 'https://github.com/movsari977kk-ops/eyekraft-releases/releases/download/v0.7.11/phone-overlay-assets.zip' -o overlay.zip
           echo 'f78cabcf1e126e105054731250a68a691614ef1e4d6213e2a4d492e08ec88f94  overlay.zip' | sha256sum --check -
           unzip -oq overlay.zip -d _site/catalog
           touch _site/.nojekyll
@@ -34,3 +44,19 @@ jobs:
           path: _site
       - uses: actions/deploy-pages@v4
         id: deployment
+      - name: Finish release migration
+        if: github.run_attempt == 1 || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.7.11 --repo "$GITHUB_REPOSITORY" --pattern latest.yml --pattern Eyekraft-Setup-0.7.11.exe --pattern '*.blockmap'
+          echo 'f57b90528e111756b8cf6da296fbea57f248d535ec0300ccef0ec7ce1d9ec4df  Eyekraft-Setup-0.7.11.exe' | sha256sum --check -
+          echo '4be7125c4a7172fa9c3ff0d6fc5e5308d00c7777bc596da877345203bcf99e1c  Eyekraft-Setup-0.7.11.exe.blockmap' | sha256sum --check -
+          echo '99dea6be3770c7c3d80f66b326bacf35049041d4186c7f0fef6e0e00daa320eb  latest.yml' | sha256sum --check -
+          gh release edit v0.7.11 --repo "$GITHUB_REPOSITORY" --latest
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" = v0.7.11
+          for tag in v0.7.9 v0.7.10; do
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null; then
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes
+            fi
+          done
