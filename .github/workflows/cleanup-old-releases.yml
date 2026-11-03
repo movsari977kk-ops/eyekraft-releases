@@ -1,0 +1,44 @@
+name: Remove superseded releases after verified migration
+on:
+  push:
+    paths: ['.github/workflows/cleanup-old-releases.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify replacement release and Pages deployment
+        env:
+          EXPECTED_PAGES_SHA: b3c5e65b38a4b7e2c314adbe2c1267c9e15d07c7
+        run: |
+          gh api repos/$GITHUB_REPOSITORY/releases/latest > latest.json
+          gh api repos/$GITHUB_REPOSITORY/actions/workflows/catalog-pages.yml/runs?per_page=10 > pages-runs.json
+          gh api repos/$GITHUB_REPOSITORY/contents/.github/workflows/catalog-pages.yml > pages-file.json
+          node <<'NODE'
+          const fs=require('fs'),r=JSON.parse(fs.readFileSync('latest.json')),runs=JSON.parse(fs.readFileSync('pages-runs.json')).workflow_runs,config=Buffer.from(JSON.parse(fs.readFileSync('pages-file.json')).content,'base64').toString();
+          if(r.tag_name!=='v0.7.9'||r.draft||r.assets.length!==5||r.assets.some(a=>a.state!=='uploaded'))throw Error('Replacement release is incomplete');
+          for(const name of ['Eyekraft-Setup-0.7.9.exe','Eyekraft-Setup-0.7.9.exe.blockmap','latest.yml','phone-catalog-assets.zip','phone-overlay-assets.zip'])if(!r.assets.some(a=>a.name===name&&a.size>0))throw Error('Missing asset '+name);
+          if(!runs.some(r=>r.head_sha===process.env.EXPECTED_PAGES_SHA&&r.conclusion==='success'))throw Error('Pages migration not verified');
+          if(!config.includes('/v0.7.9/phone-catalog-assets.zip')||!config.includes('/v0.7.9/phone-overlay-assets.zip')||config.includes('/v0.7.7/')||config.includes('/v0.7.8/'))throw Error('Pages still references old releases');
+          NODE
+      - name: Delete superseded releases and obsolete version tags
+        run: |
+          set -e
+          for tag in v0.7.7 v0.7.8; do
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+            fi
+          done
+          for tag in v0.7.1 v0.7.5 v0.7.6; do
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag"
+            fi
+          done
+          gh release list --repo "$GITHUB_REPOSITORY"
+
